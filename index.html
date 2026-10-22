@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eef5f5">
+  <title>Daybreak — 天气</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --page: #eef5f5;
+      --surface: rgba(255, 255, 255, .78);
+      --surface-strong: #fff;
+      --ink: #183536;
+      --muted: #718586;
+      --line: rgba(24, 53, 54, .09);
+      --accent: #168b83;
+      --accent-soft: #dcf2ed;
+      --sun: #f3b94f;
+      --shadow: 0 24px 70px rgba(39, 76, 74, .10);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #101b1e;
+        --surface: rgba(27, 42, 45, .82);
+        --surface-strong: #1b2a2d;
+        --ink: #e6f1ef;
+        --muted: #9aafad;
+        --line: rgba(220, 244, 238, .10);
+        --accent: #73d1bd;
+        --accent-soft: #244440;
+        --sun: #f6c968;
+        --shadow: 0 24px 70px rgba(0, 0, 0, .22);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      padding: 44px 20px 32px;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(120, 201, 181, .20), transparent 42%),
+        var(--page);
+      color: var(--ink);
+      font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      transition: background-color .2s, color .2s;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+    .app { width: min(100%, 560px); margin: 0 auto; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 750; letter-spacing: -.04em; }
+    .brand-mark {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .brand-mark svg { width: 20px; height: 20px; }
+    .eyebrow { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 9px 8px 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: 0 8px 28px rgba(36, 76, 70, .04);
+    }
+    .search svg { flex: 0 0 auto; width: 18px; height: 18px; color: var(--muted); }
+    .search input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--ink);
+      font-size: 14px;
+    }
+    .search input::placeholder { color: var(--muted); opacity: .8; }
+    .search button {
+      flex: 0 0 auto;
+      border: 0;
+      border-radius: 11px;
+      padding: 9px 14px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      transition: opacity .2s, transform .2s;
+    }
+    .search button:hover { opacity: .88; transform: translateY(-1px); }
+    .search button:disabled { cursor: wait; opacity: .65; }
+
+    .weather-card {
+      position: relative;
+      overflow: hidden;
+      margin-top: 18px;
+      padding: 28px 30px;
+      border: 1px solid var(--line);
+      border-radius: 25px;
+      background:
+        radial-gradient(circle at 85% 18%, rgba(244, 196, 98, .19), transparent 27%),
+        var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .weather-card::after {
+      position: absolute;
+      top: 50%;
+      right: -54px;
+      width: 210px;
+      height: 210px;
+      border: 1px solid rgba(22, 139, 131, .10);
+      border-radius: 50%;
+      content: "";
+      transform: translateY(-50%);
+      box-shadow: 0 0 0 22px rgba(22, 139, 131, .025), 0 0 0 46px rgba(22, 139, 131, .02);
+      pointer-events: none;
+    }
+    .place { position: relative; z-index: 1; }
+    .place h1 {
+      width: 100px;
+      height: 36px;
+      margin: 5px 0 0;
+      font-size: clamp(25px, 6vw, 32px);
+      letter-spacing: -.055em;
+      line-height: 1.2;
+      text-align: justify;
+      text-align-last: justify;
+      text-justify: inter-character;
+    }
+    .place .subtitle { margin-top: 5px; color: var(--muted); font-size: 13px; }
+    .current-row { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+    .temperature { display: flex; align-items: flex-start; font-size: clamp(68px, 18vw, 98px); font-weight: 650; letter-spacing: -.09em; line-height: .98; }
+    .temperature span { margin: 11px 0 0 6px; font-size: 30px; font-weight: 500; letter-spacing: -.06em; }
+    .condition-block { display: flex; flex-direction: column; align-items: center; min-width: 102px; }
+    .condition-icon { width: 88px; height: 88px; color: var(--sun); filter: drop-shadow(0 8px 12px rgba(227, 167, 57, .19)); }
+    .condition-label { margin-top: -2px; color: var(--muted); font-size: 13px; font-weight: 650; }
+    .details {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+      margin-top: 27px;
+      padding-top: 19px;
+      border-top: 1px solid var(--line);
+    }
+    .detail { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .detail-icon { display: grid; flex: 0 0 auto; width: 34px; height: 34px; place-items: center; border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
+    .detail-icon svg { width: 17px; height: 17px; }
+    .detail-label { color: var(--muted); font-size: 11px; }
+    .detail-value { margin-top: 1px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+
+    .forecast-heading { display: flex; align-items: center; justify-content: space-between; margin: 28px 2px 13px; }
+    .forecast-heading h2 { margin: 0; font-size: 16px; letter-spacing: -.025em; }
+    .forecast-heading span { color: var(--muted); font-size: 12px; }
+    .forecast { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px; }
+    .day-card {
+      display: flex;
+      min-height: 148px;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      text-align: center;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .day-card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(39, 76, 74, .08); }
+    .day-name { font-size: 12px; font-weight: 700; }
+    .day-date { margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .day-icon { width: 34px; height: 34px; margin: 9px 0 7px; color: var(--sun); }
+    .day-card[data-kind="rain"] .day-icon { color: #56a5c1; }
+    .day-card[data-kind="cloud"] .day-icon { color: #8d9b9c; }
+    .temps { display: flex; gap: 8px; font-size: 12px; font-weight: 750; }
+    .temps .low { color: var(--muted); font-weight: 550; }
+
+    .status { min-height: 18px; margin: 10px 3px 0; color: var(--muted); font-size: 11px; }
+    .status.error { color: #c27348; }
+    footer { margin: 23px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
+    @media (max-width: 440px) {
+      body { padding: 28px 14px 24px; }
+      .topbar { margin-bottom: 21px; }
+      .weather-card { padding: 23px 21px; border-radius: 22px; }
+      .details { gap: 5px; }
+      .detail { gap: 6px; }
+      .detail-icon { width: 30px; height: 30px; border-radius: 10px; }
+      .detail-label { font-size: 10px; }
+      .detail-value { font-size: 12px; }
+      .forecast { gap: 6px; }
+      .day-card { min-height: 139px; padding-inline: 4px; border-radius: 15px; }
+      .day-name { font-size: 11px; }
+      .temps { gap: 5px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42m0-12.72-1.42 1.42m-9.88 9.88-1.42 1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+        </span>
+        <span>daybreak</span>
+      </div>
+      <span class="eyebrow">每日天气预报</span>
+    </header>
+
+    <form class="search" id="search-form" role="search">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <input id="city-input" type="search" placeholder="搜索城市" aria-label="搜索城市" autocomplete="off">
+      <button id="search-button" type="submit">搜索</button>
+    </form>
+
+    <section class="weather-card" aria-labelledby="city-name">
+      <div class="place">
+        <div class="eyebrow" id="today-label">今天</div>
+        <h1 id="city-name">Tokyo</h1>
+        <div class="subtitle" id="city-subtitle">日本 · 当地时间</div>
+      </div>
+      <div class="current-row">
+        <div class="temperature" id="temperature" aria-label="当前气温">22<span>°</span></div>
+        <div class="condition-block">
+          <div id="current-icon" aria-hidden="true"></div>
+          <div class="condition-label" id="condition">Partly cloudy</div>
+        </div>
+      </div>
+      <div class="details">
+        <div class="detail">
+          <span class="detail-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3.5s6 6.5 6 11a6 6 0 1 1-12 0c0-4.5 6-11 6-11Z" stroke="currentColor" stroke-width="1.7"/><path d="M9 15.5a3 3 0 0 0 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+          <div><div class="detail-label">湿度</div><div class="detail-value" id="humidity">64%</div></div>
+        </div>
+        <div class="detail">
+          <span class="detail-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 8h12a2.5 2.5 0 1 0-2.4-3.2M2 12h17a2.5 2.5 0 1 1-2.4 3.2M4 16h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
+          <div><div class="detail-label">风速</div><div class="detail-value" id="wind">12 km/h</div></div>
+        </div>
+        <div class="detail">
+          <span class="detail-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18m0-18 4 4m-4-4L8 7M4 12h16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <div><div class="detail-label">体感温度</div><div class="detail-value" id="feels-like">24°</div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="forecast-heading">
+      <h2>未来 5 天</h2>
+      <span id="forecast-caption">天气预报</span>
+    </div>
+    <section class="forecast" id="forecast" aria-label="未来五天天气预报"></section>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <footer>天气数据由 Open-Meteo 提供</footer>
+  </main>
+
+  <script>
+    const fallback = {
+      city: "Tokyo",
+      country: "Japan",
+      current: { temperature_2m: 22, apparent_temperature: 24, relative_humidity_2m: 64, wind_speed_10m: 12, weather_code: 2 },
+      daily: {
+        time: ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25", "2026-10-26"],
+        weather_code: [2, 1, 3, 61, 2],
+        temperature_2m_max: [23, 24, 21, 19, 22],
+        temperature_2m_min: [17, 18, 16, 15, 16]
+      }
+    };
+
+    const icons = {
+      sun: '<svg class="condition-icon" viewBox="0 0 96 96" fill="none"><circle cx="48" cy="48" r="17" fill="currentColor"/><g stroke="currentColor" stroke-width="5" stroke-linecap="round"><path d="M48 8v10M48 78v10M8 48h10m60 0h10M19.7 19.7l7.1 7.1m42.4 42.4 7.1 7.1m0-56.6-7.1 7.1M26.8 69.2l-7.1 7.1"/></g></svg>',
+      partly: '<svg class="condition-icon" viewBox="0 0 96 96" fill="none"><circle cx="63" cy="31" r="14" fill="currentColor"/><g stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M63 7v6m0 36v6M39 31h6m36 0h6M46 14l4 4m26 26 4 4m0-34-4 4M50 44l-4 4"/></g><path d="M25 72h44a13 13 0 0 0 0-26c-2 0-4 .5-5.8 1.3A19 19 0 0 0 27 54a9 9 0 0 0-2 18Z" fill="currentColor" opacity=".84"/></svg>',
+      cloud: '<svg class="condition-icon" viewBox="0 0 96 96" fill="none"><path d="M24 72h46a15 15 0 0 0 0-30c-2.3 0-4.5.5-6.4 1.4A21 21 0 0 0 26 49a11.5 11.5 0 0 0-2 23Z" fill="currentColor" opacity=".82"/></svg>',
+      rain: '<svg class="condition-icon" viewBox="0 0 96 96" fill="none"><path d="M24 62h46a15 15 0 0 0 0-30c-2.3 0-4.5.5-6.4 1.4A21 21 0 0 0 26 39a11.5 11.5 0 0 0-2 23Z" fill="currentColor" opacity=".74"/><g stroke="#56a5c1" stroke-width="4" stroke-linecap="round"><path d="m35 71-4 8m20-8-4 8m20-8-4 8"/></g></svg>',
+      snow: '<svg class="condition-icon" viewBox="0 0 96 96" fill="none"><path d="M24 62h46a15 15 0 0 0 0-30c-2.3 0-4.5.5-6.4 1.4A21 21 0 0 0 26 39a11.5 11.5 0 0 0-2 23Z" fill="currentColor" opacity=".74"/><g stroke="#69aec5" stroke-width="3" stroke-linecap="round"><path d="M34 72v10m-4-5 8 0m17-5v10m-4-5 8 0m12-5v10m-4-5 8 0"/></g></svg>'
+    };
+    const miniIcons = Object.fromEntries(Object.entries(icons).map(([key, value]) => [key, value.replace('class="condition-icon"', 'class="day-icon"')]));
+    const $ = (id) => document.getElementById(id);
+    const status = $("status");
+
+    function weatherKind(code) {
+      if (code === 0) return ["sun", "晴朗"];
+      if (code <= 2) return ["partly", "局部多云"];
+      if (code <= 3 || code === 45 || code === 48) return ["cloud", "阴天"];
+      if ([71, 73, 75, 77, 85, 86].includes(code)) return ["snow", "降雪"];
+      if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return ["rain", "降雨"];
+      if (code >= 95) return ["rain", "雷雨"];
+      return ["partly", "天气多变"];
+    }
+
+    function render(data) {
+      $("city-name").textContent = data.city;
+      $("city-subtitle").textContent = [data.admin1, data.country].filter(Boolean).join(" · ") || "当地天气";
+      const current = data.current;
+      $("temperature").innerHTML = `${Math.round(current.temperature_2m)}<span>°</span>`;
+      $("humidity").textContent = `${current.relative_humidity_2m}%`;
+      $("wind").textContent = `${Math.round(current.wind_speed_10m)} km/h`;
+      $("feels-like").textContent = `${Math.round(current.apparent_temperature)}°`;
+      const [kind, label] = weatherKind(current.weather_code);
+      $("condition").textContent = label;
+      $("current-icon").innerHTML = icons[kind];
+
+      const days = data.daily.time.map((date, index) => {
+        const day = new Date(`${date}T12:00:00`);
+        const dayName = index === 0 ? "今天" : new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(day);
+        const dateName = new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric" }).format(day);
+        const [dayKind] = weatherKind(data.daily.weather_code[index]);
+        return `<article class="day-card" data-kind="${dayKind}"><div class="day-name">${dayName}</div><div class="day-date">${dateName}</div>${miniIcons[dayKind]}<div class="temps"><span>${Math.round(data.daily.temperature_2m_max[index])}°</span><span class="low">${Math.round(data.daily.temperature_2m_min[index])}°</span></div></article>`;
+      }).join("");
+      $("forecast").innerHTML = days;
+      $("today-label").textContent = new Intl.DateTimeFormat("zh-CN", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
+    }
+
+    async function loadCity(query) {
+      const button = $("search-button");
+      button.disabled = true;
+      button.textContent = "加载中";
+      status.className = "status";
+      status.textContent = "";
+      try {
+        const placeResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=zh&format=json`);
+        if (!placeResponse.ok) throw new Error("无法搜索该城市。");
+        const placeData = await placeResponse.json();
+        const place = placeData.results?.[0];
+        if (!place) {
+          status.className = "status error";
+          status.textContent = `未找到“${query}”，请尝试其他城市名称。`;
+          return;
+        }
+        const url = new URL("https://api.open-meteo.com/v1/forecast");
+        url.search = new URLSearchParams({
+          latitude: place.latitude,
+          longitude: place.longitude,
+          current: "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m",
+          daily: "weather_code,temperature_2m_max,temperature_2m_min",
+          timezone: "auto",
+          forecast_days: "5"
+        });
+        const forecastResponse = await fetch(url);
+        if (!forecastResponse.ok) throw new Error("无法获取天气预报。");
+        const forecast = await forecastResponse.json();
+        const city = ["Tokyo", "東京"].includes(place.name) ? "东京" : place.name;
+        render({ ...forecast, city, country: place.country, admin1: place.admin1 });
+        status.textContent = "";
+      } catch (error) {
+        render(fallback);
+        status.className = "status";
+        status.textContent = "暂时无法获取实时天气，当前显示东京示例天气。";
+        console.error("Weather lookup failed:", error);
+      } finally {
+        button.disabled = false;
+        button.textContent = "搜索";
+      }
+    }
+
+    $("search-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const query = $("city-input").value.trim();
+      if (query) loadCity(query);
+    });
+
+    render(fallback);
+    loadCity("Tokyo");
+  </script>
+</body>
+</html>
